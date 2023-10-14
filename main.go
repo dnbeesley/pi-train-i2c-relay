@@ -61,7 +61,9 @@ func main() {
 	var config = getConfig()
 
 	opts := mqtt.NewClientOptions()
-	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", config.Server.Host, config.Server.Port))
+	server := fmt.Sprintf("tcp://%s:%d", config.Server.Host, config.Server.Port)
+	fmt.Printf("Connecting to: %s", server)
+	opts.AddBroker(server)
 	opts.SetClientID(config.Auth.Username)
 	opts.SetUsername(config.Auth.Username)
 	opts.SetPassword(config.Auth.Password)
