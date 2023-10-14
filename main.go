@@ -16,7 +16,7 @@ var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
 }
 
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-	fmt.Printf("Connect lost: %v", err)
+	fmt.Printf("Connect lost: %v\n", err)
 }
 
 var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
@@ -25,32 +25,44 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 	_, addressStr := path.Split(msg.Topic())
 	address, err := strconv.ParseUint(addressStr, 16, 8)
 	if err != nil {
-		fmt.Printf("Error parsing address: %v", err)
+		fmt.Printf("Error parsing address: %v\n", err)
 		return
 	}
 
 	err = json.Unmarshal(payload, &state)
 	if err != nil {
-		fmt.Printf("Error parsing payload: %v", err)
+		fmt.Printf("Error parsing payload: %v\n", err)
 		return
 	}
 
-	fmt.Printf("Writing %d bytes to device: %x", len(state), address)
+	fmt.Printf("Writing %d bytes to device: %x\n", len(state), address)
 	write(uint8(address), state)
 }
 
+var readAllDevices = func(client mqtt.Client, devices []Device, outputTopicPrefix string) {
+	fmt.Println("Reading i2c device states")
+	for _, device := range devices {
+		readDevice(client, device, outputTopicPrefix)
+	}
+}
+
 var readDevice = func(client mqtt.Client, device Device, outputTopicPrefix string) {
-	fmt.Printf("Reading %d bytes from device: %x", device.Length, device.Address)
+	fmt.Printf("Reading %d bytes from device: %x\n", device.Length, device.Address)
 	outputTopic := path.Join(outputTopicPrefix, strconv.FormatUint(uint64(device.Address), 16))
 	var buffer = make([]uint8, device.Length)
 	received := read(device.Address, buffer)
 	if received != int(device.Length) {
-		fmt.Printf("Only read %d bytes from device: %x", received, device.Address)
+		fmt.Printf("Only read %d bytes from device: %x\n", received, device.Address)
 	}
 
-	payload, err := json.Marshal(buffer)
+	var array = make([]int, received)
+	for i, v := range buffer {
+		array[i] = int(v)
+	}
+
+	payload, err := json.Marshal(array)
 	if err != nil {
-		fmt.Printf("Error building payload: %v", err)
+		fmt.Printf("Error building payload: %v\n", err)
 		return
 	}
 
@@ -58,11 +70,12 @@ var readDevice = func(client mqtt.Client, device Device, outputTopicPrefix strin
 }
 
 func main() {
-	var config = getConfig()
+	var config RelayConfig
+	getConfig(&config)
 
 	opts := mqtt.NewClientOptions()
 	server := fmt.Sprintf("tcp://%s:%d", config.Server.Host, config.Server.Port)
-	fmt.Printf("Connecting to: %s", server)
+	fmt.Println("Connecting to:", server)
 	opts.AddBroker(server)
 	opts.SetClientID(config.Auth.Username)
 	opts.SetUsername(config.Auth.Username)
@@ -80,23 +93,15 @@ func main() {
 		panic(token.Error())
 	}
 
-	fmt.Printf("Subscribed to topic %s", inputTopic)
+	fmt.Println("Subscribed to topic:", inputTopic)
 
 	outputTopicPrefix := path.Join(config.TopicPrefix, "output")
 	s := gocron.NewScheduler(time.UTC)
-	_, err := s.Every(config.ReadInterval).Seconds().Do(func() {
-		for _, device := range config.ReadDevices {
-			readDevice(client, device, outputTopicPrefix)
-		}
-	})
+	_, err := s.Every(config.ReadInterval).Seconds().Do(readAllDevices, client, config.ReadDevices, outputTopicPrefix)
 
 	if err != nil {
 		panic(err)
 	}
 
-	for client.IsConnected() {
-
-	}
-
-	s.Stop()
+	s.StartBlocking()
 }

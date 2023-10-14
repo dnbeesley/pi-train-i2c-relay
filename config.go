@@ -17,9 +17,9 @@ type Device struct {
 
 type RelayConfig struct {
 	Auth         AuthConfig   `json:"auth"`
-	Server       ServerConfig `json:"server"`
 	ReadDevices  []Device     `json:"readDevices"`
-	ReadInterval uint         `json:"readInterval"`
+	ReadInterval int          `json:"readInterval"`
+	Server       ServerConfig `json:"server"`
 	TopicPrefix  string       `json:"topicPrefix"`
 }
 
@@ -28,9 +28,8 @@ type ServerConfig struct {
 	Port int    `json:"port"`
 }
 
-func getConfig() RelayConfig {
+func getConfig(config *RelayConfig) {
 	var buffer = make([]byte, 1024)
-	var data RelayConfig
 	file, err := os.Open("config.json")
 	if err != nil {
 		panic(err)
@@ -42,11 +41,14 @@ func getConfig() RelayConfig {
 		}
 	}()
 
-	_, err = file.Read(buffer)
+	length, err := file.Read(buffer)
 	if err != nil {
 		panic(err)
 	}
 
-	json.Unmarshal(buffer, &data)
-	return data
+	buffer = buffer[0:length]
+	err = json.Unmarshal(buffer, &config)
+	if err != nil {
+		panic(err)
+	}
 }
