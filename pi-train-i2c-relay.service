@@ -1,0 +1,10 @@
+[Unit]
+Description=Pi Train i2c relay
+
+[Service]
+ExecStart=/opt/pi-train-i2c-relay/pi-train-i2c-relay
+SyslogIdentifier=PiTrainI2cRelay
+WorkingDirectory=/opt/pi-train-i2c-relay/
+
+[Install]
+WantedBy=multi-user.target
