@@ -66,7 +66,7 @@ var readDevice = func(client mqtt.Client, device Device, outputTopicPrefix strin
 		return
 	}
 
-	client.Publish(outputTopic, 0, false, payload)
+	client.Publish(outputTopic, 0, true, payload)
 }
 
 func main() {
